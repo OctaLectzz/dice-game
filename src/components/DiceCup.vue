@@ -52,11 +52,11 @@ const diceTargets = {
 
 const layouts = {
   1: [[0, 0]],
-  2: [[-0.76, 0], [0.76, 0]],
-  3: [[-0.88, -0.12], [0, 0.48], [0.88, -0.12]],
-  4: [[-0.9, 0.34], [0.9, 0.34], [-0.9, -0.62], [0.9, -0.62]],
-  5: [[-1.05, 0.32], [0, 0.58], [1.05, 0.32], [-0.52, -0.72], [0.52, -0.72]],
-  6: [[-1.1, 0.36], [0, 0.62], [1.1, 0.36], [-1.1, -0.62], [0, -0.88], [1.1, -0.62]]
+  2: [[-0.68, 0], [0.68, 0]],
+  3: [[-0.76, -0.08], [0, 0.42], [0.76, -0.08]],
+  4: [[-0.78, 0.3], [0.78, 0.3], [-0.78, -0.54], [0.78, -0.54]],
+  5: [[-0.94, 0.28], [0, 0.52], [0.94, 0.28], [-0.48, -0.64], [0.48, -0.64]],
+  6: [[-1.02, 0.32], [0, 0.56], [1.02, 0.32], [-1.02, -0.56], [0, -0.78], [1.02, -0.56]]
 }
 
 const pipPatterns = {
@@ -160,17 +160,17 @@ function addFacePips(die, face, pipMaterial, redMaterial) {
   const normal = new THREE.Vector3(...face.normal)
   const uVector = new THREE.Vector3(...face.u)
   const vVector = new THREE.Vector3(...face.v)
-  const center = normal.clone().multiplyScalar(0.374)
+  const center = normal.clone().multiplyScalar(0.394)
   const material = face.value === 1 ? redMaterial : pipMaterial
+  const rotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal)
 
   pipPatterns[face.value].forEach(([x, y]) => {
-    const pip = new THREE.Mesh(track(new THREE.SphereGeometry(0.067, 32, 16)), material)
+    const pip = new THREE.Mesh(track(new THREE.CircleGeometry(0.065, 36)), material)
     pip.position.copy(center)
       .add(uVector.clone().multiplyScalar(x))
       .add(vVector.clone().multiplyScalar(y))
-      .add(normal.clone().multiplyScalar(0.012))
-    pip.scale.copy(new THREE.Vector3(1, 1, 0.34))
-    pip.castShadow = false
+    pip.quaternion.copy(rotation)
+    pip.renderOrder = 2
     die.add(pip)
   })
 }
@@ -187,13 +187,13 @@ function createDie(value, index, count) {
   const pipMaterial = track(new THREE.MeshStandardMaterial({ color: 0x101722, roughness: 0.42 }))
   const redPipMaterial = track(new THREE.MeshStandardMaterial({ color: 0xe6282f, roughness: 0.36 }))
 
-  const body = new THREE.Mesh(track(new RoundedBoxGeometry(0.78, 0.78, 0.78, 7, 0.12)), bodyMaterial)
+  const body = new THREE.Mesh(track(new RoundedBoxGeometry(0.78, 0.78, 0.78, 8, 0.095)), bodyMaterial)
   body.castShadow = true
   body.receiveShadow = true
   die.add(body)
 
   const bevelGlow = new THREE.Mesh(
-    track(new RoundedBoxGeometry(0.785, 0.785, 0.785, 5, 0.12)),
+    track(new RoundedBoxGeometry(0.782, 0.782, 0.782, 5, 0.095)),
     track(new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.08 }))
   )
   die.add(bevelGlow)
@@ -205,12 +205,12 @@ function createDie(value, index, count) {
   die.position.set(x, -0.55, z)
   die.userData.basePosition = die.position.clone()
   die.userData.restRotation = {
-    x: (diceTargets[value]?.x || 0) + (Math.random() - 0.5) * 0.1,
-    y: (diceTargets[value]?.y || 0) + (Math.random() - 0.5) * 0.1,
-    z: (diceTargets[value]?.z || 0) + (Math.random() - 0.5) * 0.16
+    x: diceTargets[value]?.x || 0,
+    y: diceTargets[value]?.y || 0,
+    z: diceTargets[value]?.z || 0
   }
   die.rotation.set(die.userData.restRotation.x, die.userData.restRotation.y, die.userData.restRotation.z)
-  die.scale.setScalar(count >= 5 ? 0.76 : count >= 3 ? 0.84 : 0.96)
+  die.scale.setScalar(count >= 5 ? 0.72 : count >= 3 ? 0.8 : 0.94)
 
   return die
 }
@@ -371,9 +371,9 @@ function animate(time = 0) {
 
 function setupScene() {
   scene = new THREE.Scene()
-  camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100)
-  camera.position.set(0, 2.15, 7.2)
-  camera.lookAt(0, -0.34, 0)
+  camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100)
+  camera.position.set(0, 2.75, 7.8)
+  camera.lookAt(0, -0.48, 0)
 
   createRenderer()
   createLights()
@@ -432,3 +432,5 @@ watch(
   }
 )
 </script>
+
+
