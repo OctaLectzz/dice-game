@@ -1,11 +1,12 @@
 <template>
   <div class="three-dice-scene" :class="{ 'is-rolling': rolling, 'is-open': open }">
-    <div ref="stageRef" class="three-dice-stage" aria-label="Area dadu 3D dengan penutup" />
+    <div ref="stageRef" class="three-dice-stage" aria-label="Area dadu 3D dengan penutup realistis" />
   </div>
 </template>
 
 <script setup>
 import * as THREE from 'three'
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
@@ -31,6 +32,7 @@ let camera
 let diceGroup
 let cupGroup
 let floorMesh
+let shadowPlane
 let resizeObserver
 let animationFrame = 0
 let lastTime = 0
@@ -50,12 +52,30 @@ const diceTargets = {
 
 const layouts = {
   1: [[0, 0]],
-  2: [[-0.8, 0], [0.8, 0]],
-  3: [[-1, -0.2], [0, 0.55], [1, -0.2]],
-  4: [[-1.05, 0.35], [1.05, 0.35], [-1.05, -0.75], [1.05, -0.75]],
-  5: [[-1.25, 0.3], [0, 0.65], [1.25, 0.3], [-0.65, -0.85], [0.65, -0.85]],
-  6: [[-1.35, 0.4], [0, 0.7], [1.35, 0.4], [-1.35, -0.75], [0, -1.05], [1.35, -0.75]]
+  2: [[-0.76, 0], [0.76, 0]],
+  3: [[-0.88, -0.12], [0, 0.48], [0.88, -0.12]],
+  4: [[-0.9, 0.34], [0.9, 0.34], [-0.9, -0.62], [0.9, -0.62]],
+  5: [[-1.05, 0.32], [0, 0.58], [1.05, 0.32], [-0.52, -0.72], [0.52, -0.72]],
+  6: [[-1.1, 0.36], [0, 0.62], [1.1, 0.36], [-1.1, -0.62], [0, -0.88], [1.1, -0.62]]
 }
+
+const pipPatterns = {
+  1: [[0, 0]],
+  2: [[-0.22, 0.22], [0.22, -0.22]],
+  3: [[-0.23, 0.23], [0, 0], [0.23, -0.23]],
+  4: [[-0.23, 0.23], [0.23, 0.23], [-0.23, -0.23], [0.23, -0.23]],
+  5: [[-0.23, 0.23], [0.23, 0.23], [0, 0], [-0.23, -0.23], [0.23, -0.23]],
+  6: [[-0.23, 0.25], [0.23, 0.25], [-0.23, 0], [0.23, 0], [-0.23, -0.25], [0.23, -0.25]]
+}
+
+const faceDefinitions = [
+  { value: 1, normal: [0, 0, 1], u: [1, 0, 0], v: [0, 1, 0] },
+  { value: 6, normal: [0, 0, -1], u: [-1, 0, 0], v: [0, 1, 0] },
+  { value: 3, normal: [1, 0, 0], u: [0, 0, -1], v: [0, 1, 0] },
+  { value: 4, normal: [-1, 0, 0], u: [0, 0, 1], v: [0, 1, 0] },
+  { value: 2, normal: [0, 1, 0], u: [1, 0, 0], v: [0, 0, -1] },
+  { value: 5, normal: [0, -1, 0], u: [1, 0, 0], v: [0, 0, 1] }
+]
 
 const easeOutCubic = (value) => 1 - Math.pow(1 - value, 3)
 const lerp = (from, to, amount) => from + (to - from) * amount
@@ -66,126 +86,150 @@ function track(item) {
 }
 
 function createRenderer() {
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' })
   renderer.setClearColor(0x000000, 0)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.5))
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
   renderer.outputColorSpace = THREE.SRGBColorSpace
+  renderer.toneMapping = THREE.ACESFilmicToneMapping
+  renderer.toneMappingExposure = 1.04
   stageRef.value.appendChild(renderer.domElement)
 }
 
 function createLights() {
-  const ambient = new THREE.HemisphereLight(0xffffff, 0x2f4a39, 2.1)
+  const ambient = new THREE.HemisphereLight(0xffffff, 0x7a4638, 1.45)
   scene.add(ambient)
 
-  const keyLight = new THREE.DirectionalLight(0xffffff, 3.4)
-  keyLight.position.set(-4, 6, 5)
+  const keyLight = new THREE.DirectionalLight(0xffffff, 4.8)
+  keyLight.position.set(-3.8, 6.4, 5.2)
   keyLight.castShadow = true
-  keyLight.shadow.mapSize.set(1024, 1024)
+  keyLight.shadow.mapSize.set(2048, 2048)
+  keyLight.shadow.camera.near = 0.5
+  keyLight.shadow.camera.far = 14
+  keyLight.shadow.camera.left = -5
+  keyLight.shadow.camera.right = 5
+  keyLight.shadow.camera.top = 5
+  keyLight.shadow.camera.bottom = -5
   scene.add(keyLight)
 
-  const rimLight = new THREE.PointLight(0xffe2ca, 2.1, 10)
-  rimLight.position.set(3.5, 3, -3)
+  const fillLight = new THREE.DirectionalLight(0xffe3cf, 1.35)
+  fillLight.position.set(4.5, 2.5, -2.5)
+  scene.add(fillLight)
+
+  const rimLight = new THREE.PointLight(0xfff0df, 2.2, 9)
+  rimLight.position.set(2.6, 3.8, 3.4)
   scene.add(rimLight)
 }
 
 function createFloor() {
-  const geometry = track(new THREE.CylinderGeometry(3.45, 3.72, 0.28, 96))
-  const material = track(new THREE.MeshStandardMaterial({
-    color: 0xfffaf1,
-    roughness: 0.62,
-    metalness: 0.05
-  }))
-
-  floorMesh = new THREE.Mesh(geometry, material)
-  floorMesh.position.y = -1.15
+  floorMesh = new THREE.Mesh(
+    track(new THREE.CylinderGeometry(3.15, 3.35, 0.18, 128)),
+    track(new THREE.MeshPhysicalMaterial({
+      color: 0xfffbf1,
+      roughness: 0.48,
+      metalness: 0.02,
+      clearcoat: 0.35,
+      clearcoatRoughness: 0.45
+    }))
+  )
+  floorMesh.position.y = -1.1
   floorMesh.receiveShadow = true
   scene.add(floorMesh)
 
   const rim = new THREE.Mesh(
-    track(new THREE.TorusGeometry(3.48, 0.055, 12, 96)),
-    track(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.38 }))
+    track(new THREE.TorusGeometry(3.18, 0.035, 16, 128)),
+    track(new THREE.MeshPhysicalMaterial({ color: 0xf4eadc, roughness: 0.32, clearcoat: 0.55 }))
   )
-  rim.position.y = -0.97
+  rim.position.y = -0.995
   rim.rotation.x = Math.PI / 2
   rim.receiveShadow = true
   scene.add(rim)
+
+  shadowPlane = new THREE.Mesh(
+    track(new THREE.CircleGeometry(3.05, 96)),
+    track(new THREE.ShadowMaterial({ color: 0x1f140f, opacity: 0.22 }))
+  )
+  shadowPlane.position.y = -0.985
+  shadowPlane.rotation.x = -Math.PI / 2
+  shadowPlane.receiveShadow = true
+  scene.add(shadowPlane)
 }
 
-function makeDot(x, y, facePosition, faceRotation, red = false) {
-  const geometry = track(new THREE.CylinderGeometry(0.075, 0.075, 0.018, 24))
-  const material = track(new THREE.MeshStandardMaterial({
-    color: red ? 0xe22929 : 0x111827,
-    roughness: 0.5
-  }))
-  const dot = new THREE.Mesh(geometry, material)
+function addFacePips(die, face, pipMaterial, redMaterial) {
+  const normal = new THREE.Vector3(...face.normal)
+  const uVector = new THREE.Vector3(...face.u)
+  const vVector = new THREE.Vector3(...face.v)
+  const center = normal.clone().multiplyScalar(0.374)
+  const material = face.value === 1 ? redMaterial : pipMaterial
 
-  dot.position.copy(facePosition)
-  dot.rotation.copy(faceRotation)
-
-  const offset = new THREE.Vector3(x, y, 0)
-  offset.applyEuler(faceRotation)
-  dot.position.add(offset)
-
-  return dot
-}
-
-function addFaceDots(die, value, facePosition, faceRotation) {
-  const pipPositions = {
-    1: [[0, 0]],
-    2: [[-0.24, 0.24], [0.24, -0.24]],
-    3: [[-0.25, 0.25], [0, 0], [0.25, -0.25]],
-    4: [[-0.25, 0.25], [0.25, 0.25], [-0.25, -0.25], [0.25, -0.25]],
-    5: [[-0.25, 0.25], [0.25, 0.25], [0, 0], [-0.25, -0.25], [0.25, -0.25]],
-    6: [[-0.25, 0.28], [0.25, 0.28], [-0.25, 0], [0.25, 0], [-0.25, -0.28], [0.25, -0.28]]
-  }
-
-  pipPositions[value].forEach(([x, y]) => {
-    die.add(makeDot(x, y, facePosition, faceRotation, value === 1))
+  pipPatterns[face.value].forEach(([x, y]) => {
+    const pip = new THREE.Mesh(track(new THREE.SphereGeometry(0.067, 32, 16)), material)
+    pip.position.copy(center)
+      .add(uVector.clone().multiplyScalar(x))
+      .add(vVector.clone().multiplyScalar(y))
+      .add(normal.clone().multiplyScalar(0.012))
+    pip.scale.copy(new THREE.Vector3(1, 1, 0.34))
+    pip.castShadow = false
+    die.add(pip)
   })
 }
 
 function createDie(value, index, count) {
   const die = new THREE.Group()
-  const body = new THREE.Mesh(
-    track(new THREE.BoxGeometry(0.72, 0.72, 0.72, 5, 5, 5)),
-    track(new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.32,
-      metalness: 0.04
-    }))
-  )
+  const bodyMaterial = track(new THREE.MeshPhysicalMaterial({
+    color: 0xfdfcf8,
+    roughness: 0.28,
+    metalness: 0.02,
+    clearcoat: 0.72,
+    clearcoatRoughness: 0.2
+  }))
+  const pipMaterial = track(new THREE.MeshStandardMaterial({ color: 0x101722, roughness: 0.42 }))
+  const redPipMaterial = track(new THREE.MeshStandardMaterial({ color: 0xe6282f, roughness: 0.36 }))
+
+  const body = new THREE.Mesh(track(new RoundedBoxGeometry(0.78, 0.78, 0.78, 7, 0.12)), bodyMaterial)
   body.castShadow = true
   body.receiveShadow = true
   die.add(body)
 
-  addFaceDots(die, 1, new THREE.Vector3(0, 0, 0.371), new THREE.Euler(Math.PI / 2, 0, 0))
-  addFaceDots(die, 6, new THREE.Vector3(0, 0, -0.371), new THREE.Euler(-Math.PI / 2, 0, 0))
-  addFaceDots(die, 3, new THREE.Vector3(0.371, 0, 0), new THREE.Euler(0, 0, -Math.PI / 2))
-  addFaceDots(die, 4, new THREE.Vector3(-0.371, 0, 0), new THREE.Euler(0, 0, Math.PI / 2))
-  addFaceDots(die, 2, new THREE.Vector3(0, 0.371, 0), new THREE.Euler(0, 0, 0))
-  addFaceDots(die, 5, new THREE.Vector3(0, -0.371, 0), new THREE.Euler(Math.PI, 0, 0))
+  const bevelGlow = new THREE.Mesh(
+    track(new RoundedBoxGeometry(0.785, 0.785, 0.785, 5, 0.12)),
+    track(new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.08 }))
+  )
+  die.add(bevelGlow)
+
+  faceDefinitions.forEach((face) => addFacePips(die, face, pipMaterial, redPipMaterial))
 
   const countLayout = layouts[count] || layouts[6]
   const [x, z] = countLayout[index] || [0, 0]
-  die.position.set(x, -0.52, z)
+  die.position.set(x, -0.55, z)
   die.userData.basePosition = die.position.clone()
   die.userData.restRotation = {
-    x: (diceTargets[value]?.x || 0) + (Math.random() - 0.5) * 0.18,
-    y: (diceTargets[value]?.y || 0) + (Math.random() - 0.5) * 0.18,
-    z: (diceTargets[value]?.z || 0) + (Math.random() - 0.5) * 0.24
+    x: (diceTargets[value]?.x || 0) + (Math.random() - 0.5) * 0.1,
+    y: (diceTargets[value]?.y || 0) + (Math.random() - 0.5) * 0.1,
+    z: (diceTargets[value]?.z || 0) + (Math.random() - 0.5) * 0.16
   }
   die.rotation.set(die.userData.restRotation.x, die.userData.restRotation.y, die.userData.restRotation.z)
-  die.scale.setScalar(count >= 5 ? 0.78 : count >= 3 ? 0.86 : 0.95)
+  die.scale.setScalar(count >= 5 ? 0.76 : count >= 3 ? 0.84 : 0.96)
 
   return die
+}
+
+function disposeObject(object) {
+  object.traverse((child) => {
+    if (child.geometry) child.geometry.dispose()
+    if (Array.isArray(child.material)) child.material.forEach((material) => material.dispose?.())
+    else child.material?.dispose?.()
+  })
 }
 
 function rebuildDice() {
   if (!diceGroup) return
 
-  diceMeshes.forEach((die) => diceGroup.remove(die))
+  diceMeshes.forEach((die) => {
+    diceGroup.remove(die)
+    disposeObject(die)
+  })
   diceMeshes = props.dice.map((value, index) => createDie(value, index, props.dice.length))
   diceMeshes.forEach((die) => diceGroup.add(die))
 }
@@ -193,54 +237,80 @@ function rebuildDice() {
 function createCup() {
   cupGroup = new THREE.Group()
 
-  const wallMaterial = track(new THREE.MeshStandardMaterial({
-    color: 0xd92736,
-    roughness: 0.42,
-    metalness: 0.12,
+  const leatherRed = track(new THREE.MeshPhysicalMaterial({
+    color: 0xb51226,
+    roughness: 0.38,
+    metalness: 0.03,
+    clearcoat: 0.65,
+    clearcoatRoughness: 0.18
+  }))
+  const darkRed = track(new THREE.MeshPhysicalMaterial({
+    color: 0x5f0712,
+    roughness: 0.34,
+    metalness: 0.05,
+    clearcoat: 0.75,
+    clearcoatRoughness: 0.16
+  }))
+  const highlight = track(new THREE.MeshPhysicalMaterial({
+    color: 0xff5c66,
+    roughness: 0.26,
+    clearcoat: 0.9,
+    clearcoatRoughness: 0.12,
     transparent: true,
-    opacity: 0.97
-  }))
-  const darkMaterial = track(new THREE.MeshStandardMaterial({
-    color: 0x8a1220,
-    roughness: 0.48,
-    metalness: 0.08
-  }))
-  const highlightMaterial = track(new THREE.MeshStandardMaterial({
-    color: 0xff6e74,
-    roughness: 0.35,
-    metalness: 0.05
+    opacity: 0.55
   }))
 
-  const body = new THREE.Mesh(track(new THREE.CylinderGeometry(1.78, 2.2, 2.25, 96, 1, true)), wallMaterial)
+  const cupProfile = [
+    new THREE.Vector2(2.04, -1.26),
+    new THREE.Vector2(2.12, -1.08),
+    new THREE.Vector2(1.96, -0.46),
+    new THREE.Vector2(1.78, 0.42),
+    new THREE.Vector2(1.58, 1.08),
+    new THREE.Vector2(1.48, 1.23)
+  ]
+
+  const body = new THREE.Mesh(track(new THREE.LatheGeometry(cupProfile, 160)), leatherRed)
   body.castShadow = true
   body.receiveShadow = true
   cupGroup.add(body)
 
-  const topRing = new THREE.Mesh(track(new THREE.TorusGeometry(1.78, 0.095, 18, 96)), darkMaterial)
-  topRing.position.y = 1.14
-  topRing.rotation.x = Math.PI / 2
-  topRing.castShadow = true
-  cupGroup.add(topRing)
+  const topCap = new THREE.Mesh(track(new THREE.CylinderGeometry(1.58, 1.48, 0.22, 160)), darkRed)
+  topCap.position.y = 1.27
+  topCap.castShadow = true
+  topCap.receiveShadow = true
+  cupGroup.add(topCap)
 
-  const lowerRing = new THREE.Mesh(track(new THREE.TorusGeometry(2.18, 0.105, 18, 96)), darkMaterial)
-  lowerRing.position.y = -1.13
-  lowerRing.rotation.x = Math.PI / 2
-  lowerRing.castShadow = true
-  cupGroup.add(lowerRing)
+  const topRim = new THREE.Mesh(track(new THREE.TorusGeometry(1.55, 0.075, 18, 160)), darkRed)
+  topRim.position.y = 1.4
+  topRim.rotation.x = Math.PI / 2
+  topRim.castShadow = true
+  cupGroup.add(topRim)
 
-  const lid = new THREE.Mesh(track(new THREE.CylinderGeometry(1.85, 1.98, 0.2, 96)), darkMaterial)
-  lid.position.y = 1.24
-  lid.castShadow = true
-  cupGroup.add(lid)
+  const bottomRim = new THREE.Mesh(track(new THREE.TorusGeometry(2.07, 0.105, 20, 160)), darkRed)
+  bottomRim.position.y = -1.25
+  bottomRim.rotation.x = Math.PI / 2
+  bottomRim.castShadow = true
+  cupGroup.add(bottomRim)
 
-  const shine = new THREE.Mesh(track(new THREE.BoxGeometry(0.16, 1.62, 0.035)), highlightMaterial)
-  shine.position.set(-0.85, 0.02, 1.72)
-  shine.rotation.z = -0.16
-  shine.castShadow = true
+  for (let i = 0; i < 4; i += 1) {
+    const groove = new THREE.Mesh(
+      track(new THREE.TorusGeometry(1.74 + i * 0.095, 0.012, 8, 128)),
+      track(new THREE.MeshStandardMaterial({ color: 0x7d0b18, roughness: 0.55 }))
+    )
+    groove.position.y = 0.76 - i * 0.48
+    groove.rotation.x = Math.PI / 2
+    cupGroup.add(groove)
+  }
+
+  const shine = new THREE.Mesh(track(new THREE.CapsuleGeometry(0.065, 1.52, 8, 24)), highlight)
+  shine.position.set(-0.82, 0.1, 1.56)
+  shine.rotation.z = -0.15
+  shine.rotation.x = 0.18
+  shine.castShadow = false
   cupGroup.add(shine)
 
-  cupGroup.position.y = props.open ? 2.65 : 0.22
-  cupGroup.rotation.x = -0.12
+  cupGroup.position.y = props.open ? 2.72 : 0.08
+  cupGroup.rotation.x = -0.09
   scene.add(cupGroup)
 }
 
@@ -260,19 +330,19 @@ function animate(time = 0) {
   const delta = Math.min(0.05, (time - lastTime) / 1000 || 0.016)
   lastTime = time
   shakePhase += delta * 8.5
-  revealPulse = Math.max(0, revealPulse - delta * 1.7)
+  revealPulse = Math.max(0, revealPulse - delta * 1.9)
 
   const rollingAmount = props.rolling ? 1 : 0
-  const targetCupY = props.rolling ? 0.02 : props.open ? 2.85 : 0.18
-  const liftShake = props.rolling ? Math.sin(shakePhase * 1.4) * 0.1 : 0
-  cupGroup.position.y = lerp(cupGroup.position.y, targetCupY + liftShake, 0.12)
-  cupGroup.rotation.z = lerp(cupGroup.rotation.z, props.rolling ? Math.sin(shakePhase * 1.8) * 0.12 : 0, 0.14)
-  cupGroup.rotation.y = lerp(cupGroup.rotation.y, props.rolling ? Math.cos(shakePhase * 1.5) * 0.14 : 0, 0.14)
-  cupGroup.rotation.x = lerp(cupGroup.rotation.x, props.rolling ? -0.18 + Math.sin(shakePhase) * 0.08 : -0.12, 0.14)
+  const targetCupY = props.rolling ? 0 : props.open ? 2.92 : 0.08
+  const liftShake = props.rolling ? Math.sin(shakePhase * 1.35) * 0.08 : 0
+  cupGroup.position.y = lerp(cupGroup.position.y, targetCupY + liftShake, 0.13)
+  cupGroup.rotation.z = lerp(cupGroup.rotation.z, props.rolling ? Math.sin(shakePhase * 1.85) * 0.105 : 0, 0.14)
+  cupGroup.rotation.y = lerp(cupGroup.rotation.y, props.rolling ? Math.cos(shakePhase * 1.45) * 0.12 : 0, 0.14)
+  cupGroup.rotation.x = lerp(cupGroup.rotation.x, props.rolling ? -0.14 + Math.sin(shakePhase) * 0.06 : -0.09, 0.14)
 
   diceGroup.visible = props.open
-  diceGroup.position.x = props.rolling ? Math.sin(shakePhase * 2.2) * 0.1 : 0
-  diceGroup.position.z = props.rolling ? Math.cos(shakePhase * 1.9) * 0.08 : 0
+  diceGroup.position.x = props.rolling ? Math.sin(shakePhase * 2.2) * 0.08 : 0
+  diceGroup.position.z = props.rolling ? Math.cos(shakePhase * 1.9) * 0.065 : 0
 
   diceMeshes.forEach((die, index) => {
     const phase = shakePhase + index * 0.73
@@ -280,29 +350,30 @@ function animate(time = 0) {
     const rest = die.userData.restRotation
 
     if (props.rolling) {
-      die.position.y = base.y + Math.abs(Math.sin(phase * 1.8)) * 0.16
+      die.position.y = base.y + Math.abs(Math.sin(phase * 1.8)) * 0.14
       die.rotation.x += delta * (6.2 + index * 0.7)
       die.rotation.y += delta * (8.5 + index * 0.6)
       die.rotation.z += delta * (5.1 + index * 0.45)
     } else {
-      const revealBounce = easeOutCubic(revealPulse) * 0.25
-      die.position.y = lerp(die.position.y, base.y + revealBounce, 0.16)
-      die.rotation.x = lerp(die.rotation.x, rest.x, 0.13)
-      die.rotation.y = lerp(die.rotation.y, rest.y, 0.13)
-      die.rotation.z = lerp(die.rotation.z, rest.z, 0.13)
+      const revealBounce = easeOutCubic(revealPulse) * 0.28
+      die.position.y = lerp(die.position.y, base.y + revealBounce, 0.18)
+      die.rotation.x = lerp(die.rotation.x, rest.x, 0.15)
+      die.rotation.y = lerp(die.rotation.y, rest.y, 0.15)
+      die.rotation.z = lerp(die.rotation.z, rest.z, 0.15)
     }
   })
 
-  floorMesh.scale.setScalar(1 + rollingAmount * 0.018)
+  floorMesh.scale.setScalar(1 + rollingAmount * 0.012)
+  shadowPlane.material.opacity = props.open ? 0.18 : 0.26
   renderer.render(scene, camera)
   animationFrame = window.requestAnimationFrame(animate)
 }
 
 function setupScene() {
   scene = new THREE.Scene()
-  camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100)
-  camera.position.set(0, 2.3, 7.3)
-  camera.lookAt(0, -0.2, 0)
+  camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100)
+  camera.position.set(0, 2.15, 7.2)
+  camera.lookAt(0, -0.34, 0)
 
   createRenderer()
   createLights()
@@ -326,6 +397,7 @@ function disposeScene() {
   window.removeEventListener('resize', updateSize)
   resizeObserver?.disconnect()
   renderer?.domElement?.remove()
+  diceMeshes.forEach(disposeObject)
   disposableItems.forEach((item) => item.dispose?.())
   renderer?.dispose()
 }
@@ -336,10 +408,21 @@ onBeforeUnmount(disposeScene)
 watch(
   () => props.dice,
   () => {
+    if (props.rolling) return
     rebuildDice()
-    if (props.open && !props.rolling) revealPulse = 1
+    if (props.open) revealPulse = 1
   },
   { deep: true }
+)
+
+watch(
+  () => props.rolling,
+  (isRolling) => {
+    if (!isRolling) {
+      rebuildDice()
+      if (props.open) revealPulse = 1
+    }
+  }
 )
 
 watch(
@@ -349,4 +432,3 @@ watch(
   }
 )
 </script>
-
