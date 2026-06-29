@@ -1,0 +1,29 @@
+{
+  "name": "quasar-dice-game",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Aplikasi permainan Dice berbasis Quasar + Capacitor untuk hiburan pribadi.",
+  "productName": "Dice Fun",
+  "author": "Solvera Indonesia",
+  "private": true,
+  "scripts": {
+    "dev": "quasar dev",
+    "build": "quasar build",
+    "dev:android": "quasar dev -m capacitor -T android --ide",
+    "build:android": "quasar build -m capacitor -T android"
+  },
+  "dependencies": {
+    "@quasar/extras": "latest",
+    "quasar": "latest",
+    "vue": "latest",
+    "vue-router": "latest"
+  },
+  "devDependencies": {
+    "@quasar/app-vite": "latest",
+    "vite": "latest",
+    "typescript": "latest"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
