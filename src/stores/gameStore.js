@@ -60,24 +60,154 @@ const state = reactive({
   lastResultText: 'Tekan Roll untuk mulai'
 })
 
-function playRollSound() {
-  if (!state.settings.sound || typeof window === 'undefined') return
+let audioContext
+let masterGain
+
+function getAudioContext() {
+  if (typeof window === 'undefined') return null
+  const AudioContext = window.AudioContext || window.webkitAudioContext
+  if (!AudioContext) return null
+
+  if (!audioContext) {
+    audioContext = new AudioContext()
+    masterGain = audioContext.createGain()
+    masterGain.gain.value = 0.9
+    masterGain.connect(audioContext.destination)
+  }
+
+  if (audioContext.state === 'suspended') {
+    audioContext.resume()
+  }
+
+  return audioContext
+}
+
+function createNoiseBuffer(context, duration = 0.32) {
+  const sampleRate = context.sampleRate
+  const buffer = context.createBuffer(1, Math.floor(sampleRate * duration), sampleRate)
+  const data = buffer.getChannelData(0)
+
+  for (let index = 0; index < data.length; index += 1) {
+    data[index] = (Math.random() * 2 - 1) * (1 - index / data.length)
+  }
+
+  return buffer
+}
+
+function playNoiseBurst(context, startTime, duration, volume, filterFrequency = 900, type = 'bandpass') {
+  const noise = context.createBufferSource()
+  const filter = context.createBiquadFilter()
+  const gain = context.createGain()
+
+  noise.buffer = createNoiseBuffer(context, duration)
+  filter.type = type
+  filter.frequency.setValueAtTime(filterFrequency, startTime)
+  filter.Q.setValueAtTime(1.6, startTime)
+  gain.gain.setValueAtTime(0.0001, startTime)
+  gain.gain.linearRampToValueAtTime(volume, startTime + 0.012)
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration)
+
+  noise.connect(filter)
+  filter.connect(gain)
+  gain.connect(masterGain)
+  noise.start(startTime)
+  noise.stop(startTime + duration)
+}
+
+function playThump(context, startTime, volume = 0.42, frequency = 110) {
+  const oscillator = context.createOscillator()
+  const gain = context.createGain()
+  const filter = context.createBiquadFilter()
+
+  oscillator.type = 'sine'
+  oscillator.frequency.setValueAtTime(frequency, startTime)
+  oscillator.frequency.exponentialRampToValueAtTime(48, startTime + 0.18)
+  filter.type = 'lowpass'
+  filter.frequency.setValueAtTime(260, startTime)
+  gain.gain.setValueAtTime(0.0001, startTime)
+  gain.gain.linearRampToValueAtTime(volume, startTime + 0.015)
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.26)
+
+  oscillator.connect(filter)
+  filter.connect(gain)
+  gain.connect(masterGain)
+  oscillator.start(startTime)
+  oscillator.stop(startTime + 0.28)
+}
+
+function playDiceClick(context, startTime, volume = 0.22, frequency = 620) {
+  const oscillator = context.createOscillator()
+  const gain = context.createGain()
+  const filter = context.createBiquadFilter()
+
+  oscillator.type = 'triangle'
+  oscillator.frequency.setValueAtTime(frequency, startTime)
+  oscillator.frequency.exponentialRampToValueAtTime(frequency * 0.55, startTime + 0.055)
+  filter.type = 'highpass'
+  filter.frequency.setValueAtTime(180, startTime)
+  gain.gain.setValueAtTime(0.0001, startTime)
+  gain.gain.linearRampToValueAtTime(volume, startTime + 0.004)
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.11)
+
+  oscillator.connect(filter)
+  filter.connect(gain)
+  gain.connect(masterGain)
+  oscillator.start(startTime)
+  oscillator.stop(startTime + 0.12)
+}
+
+function playDiceShakeSound(durationMs = 1000, diceCount = 3) {
+  if (!state.settings.sound) return
 
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext
-    const context = new AudioContext()
-    const oscillator = context.createOscillator()
-    const gain = context.createGain()
+    const context = getAudioContext()
+    if (!context) return
+    const now = context.currentTime
+    const duration = Math.max(0.55, durationMs / 1000)
+    const hitCount = Math.max(10, Math.round(duration * (9 + diceCount * 1.8)))
 
-    oscillator.type = 'triangle'
-    oscillator.frequency.value = 420
-    gain.gain.setValueAtTime(0.045, context.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.18)
+    playThump(context, now, 0.34, 118)
+    playNoiseBurst(context, now + 0.02, Math.min(duration, 0.72), 0.18, 780)
 
-    oscillator.connect(gain)
-    gain.connect(context.destination)
-    oscillator.start()
-    oscillator.stop(context.currentTime + 0.18)
+    for (let index = 0; index < hitCount; index += 1) {
+      const progress = index / Math.max(1, hitCount - 1)
+      const time = now + 0.06 + progress * duration + Math.random() * 0.035
+      const wave = 0.5 + Math.sin(progress * Math.PI * 5.5) * 0.5
+      const volume = 0.11 + wave * 0.11 + Math.random() * 0.07
+      const pitch = 360 + Math.random() * 780
+
+      playDiceClick(context, time, volume, pitch)
+
+      if (index % 3 === 0) {
+        playNoiseBurst(context, time, 0.09 + Math.random() * 0.08, 0.045 + Math.random() * 0.04, 1200 + Math.random() * 900, 'bandpass')
+      }
+
+      if (index % 5 === 0) {
+        playThump(context, time + 0.018, 0.12 + Math.random() * 0.08, 72 + Math.random() * 36)
+      }
+    }
+
+    playNoiseBurst(context, now + duration * 0.78, 0.22, 0.11, 1500, 'highpass')
+  } catch (error) {
+    // Sound is optional. Ignore unsupported browser errors.
+  }
+}
+
+function playRollRevealSound(diceCount = 3) {
+  if (!state.settings.sound) return
+
+  try {
+    const context = getAudioContext()
+    if (!context) return
+    const now = context.currentTime
+
+    playNoiseBurst(context, now, 0.2, 0.12, 1450, 'highpass')
+    playThump(context, now + 0.08, 0.38, 92)
+
+    for (let index = 0; index < diceCount; index += 1) {
+      playDiceClick(context, now + 0.14 + index * 0.045, 0.2, 540 + Math.random() * 520)
+      playNoiseBurst(context, now + 0.145 + index * 0.045, 0.08, 0.055, 1800, 'highpass')
+    }
   } catch (error) {
     // Sound is optional. Ignore unsupported browser errors.
   }
@@ -126,8 +256,6 @@ function rollDice() {
 
   state.rolling = true
   state.lastResultText = 'Dadu sedang dilempar...'
-  playRollSound()
-  vibrate([25, 30, 25])
 
   const ticksBySpeed = {
     slow: 18,
@@ -142,6 +270,10 @@ function rollDice() {
 
   const maxTicks = ticksBySpeed[state.settings.animationSpeed] || ticksBySpeed.normal
   const interval = intervalBySpeed[state.settings.animationSpeed] || intervalBySpeed.normal
+  const rollDuration = maxTicks * interval
+
+  playDiceShakeSound(rollDuration, state.settings.diceCount)
+  vibrate([25, 30, 25])
 
   return new Promise((resolve) => {
     let tick = 0
@@ -169,7 +301,7 @@ function rollDice() {
         })
 
         state.rolling = false
-        playRollSound()
+        window.setTimeout(() => playRollRevealSound(finalDice.length), 120)
         vibrate(60)
 
         if (state.round >= state.settings.maxRounds) {
@@ -181,7 +313,6 @@ function rollDice() {
     }, interval)
   })
 }
-
 const totalDice = computed(() => state.dice.reduce((sum, value) => sum + value, 0))
 const progress = computed(() => Math.min(1, state.round / state.settings.maxRounds))
 
@@ -196,3 +327,8 @@ export function useGameStore() {
     finishGame
   }
 }
+
+
+
+
+

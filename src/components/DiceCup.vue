@@ -309,7 +309,7 @@ function createCup() {
   shine.castShadow = false
   cupGroup.add(shine)
 
-  cupGroup.position.y = props.open ? 2.72 : 0.08
+  cupGroup.position.y = props.open ? 2.72 : 0.28
   cupGroup.rotation.x = -0.09
   scene.add(cupGroup)
 }
@@ -333,9 +333,10 @@ function animate(time = 0) {
   revealPulse = Math.max(0, revealPulse - delta * 1.9)
 
   const rollingAmount = props.rolling ? 1 : 0
-  const targetCupY = props.rolling ? 0 : props.open ? 2.92 : 0.08
-  const liftShake = props.rolling ? Math.sin(shakePhase * 1.35) * 0.08 : 0
-  cupGroup.position.y = lerp(cupGroup.position.y, targetCupY + liftShake, 0.13)
+  const closedCupY = 0.28
+  const targetCupY = props.rolling ? closedCupY : props.open ? 2.92 : closedCupY
+  const liftShake = props.rolling ? Math.max(0, Math.sin(shakePhase * 1.35) * 0.08) : 0
+  cupGroup.position.y = Math.max(closedCupY, lerp(cupGroup.position.y, targetCupY + liftShake, 0.13))
   cupGroup.rotation.z = lerp(cupGroup.rotation.z, props.rolling ? Math.sin(shakePhase * 1.85) * 0.105 : 0, 0.14)
   cupGroup.rotation.y = lerp(cupGroup.rotation.y, props.rolling ? Math.cos(shakePhase * 1.45) * 0.12 : 0, 0.14)
   cupGroup.rotation.x = lerp(cupGroup.rotation.x, props.rolling ? -0.14 + Math.sin(shakePhase) * 0.06 : -0.09, 0.14)
@@ -432,5 +433,6 @@ watch(
   }
 )
 </script>
+
 
 
