@@ -15,13 +15,14 @@
   "dependencies": {
     "@quasar/extras": "latest",
     "quasar": "latest",
+    "three": "^0.185.0",
     "vue": "latest",
     "vue-router": "latest"
   },
   "devDependencies": {
     "@quasar/app-vite": "latest",
-    "vite": "latest",
-    "typescript": "latest"
+    "typescript": "latest",
+    "vite": "latest"
   },
   "engines": {
     "node": ">=18"

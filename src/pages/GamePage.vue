@@ -39,15 +39,6 @@
           :rolling="state.rolling"
           :open="!state.rolling && state.lastTotal > 0"
         />
-
-        <div v-if="!state.rolling && state.lastTotal > 0" class="dice-preview">
-          <DiceFace
-            v-for="(item, index) in state.dice"
-            :key="`${index}-${item}-${state.round}`"
-            :value="item"
-            small
-          />
-        </div>
       </main>
 
       <section v-if="state.settings.showHistory" class="history-panel">
@@ -89,7 +80,6 @@ import { watch } from 'vue'
 import { Dialog } from 'quasar'
 import { useRouter } from 'vue-router'
 import DiceCup from '../components/DiceCup.vue'
-import DiceFace from '../components/DiceFace.vue'
 import GameHeaderSlots from '../components/GameHeaderSlots.vue'
 import { useGameStore } from '../stores/gameStore'
 
@@ -126,3 +116,5 @@ watch(
   }
 )
 </script>
+
+
