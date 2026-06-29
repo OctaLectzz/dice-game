@@ -1,85 +1,125 @@
-# Dice Fun - Quasar Dice Game
+# 🎲 Dice Fun - Aplikasi Game Dadu 3D Interaktif
 
-Aplikasi permainan Dice untuk hiburan pribadi, dibuat menggunakan Quasar + Vue 3 dan disiapkan agar bisa dibuild menjadi APK Android melalui Capacitor.
+Aplikasi game dadu interaktif dengan visual 3D modern dan efek animasi realistis. Game ini dibuat menggunakan framework **Quasar (Vue 3)**, pustaka grafis **Three.js** untuk rendering 3D, dan **Capacitor** untuk dikonversi menjadi aplikasi Android (.APK).
 
-## Fitur
+Aplikasi ini ditujukan untuk hiburan personal, bermain bersama teman/keluarga secara offline, dengan pencatatan skor dan chip virtual lokal.
 
-- Splash Screen
-- Menu Utama
-- Halaman Permainan
-- Animasi lempar dadu/cup
-- Generate angka acak 1-6 otomatis
-- Dukungan 1 sampai 3 dadu
-- Riwayat hasil roll
-- Skor dan chip hiburan lokal
-- Pengaturan nama pemain, jumlah dadu, ronde, suara, getar, dan kecepatan animasi
-- Halaman Hasil Akhir
-- Layout mobile portrait mengikuti referensi video: top slot cards, red dice cup, roll button, result/history panel
+---
 
-## Struktur Folder
+## 🌟 Fitur Utama
 
-```txt
-src/
-  components/
-    DiceCup.vue
-    DiceFace.vue
-    GameHeaderSlots.vue
-  css/
-    app.css
-  layouts/
-    MainLayout.vue
-  pages/
-    SplashPage.vue
-    MenuPage.vue
-    GamePage.vue
-    HowToPlayPage.vue
-    SettingsPage.vue
-    ResultPage.vue
-  router/
-    index.js
-    routes.js
-  stores/
-    gameStore.js
-```
+- **Visual 3D Realistis**: Dadu berbentuk kubus 3D yang berputar acak secara dinamis di dalam wadah piringan.
+- **Animasi Penutup Cup**: Wadah dadu (cup merah) akan menutup dadu saat dikocok, bergetar dinamis, dan terangkat miring untuk memunculkan hasil dadu.
+- **Jumlah Dadu Fleksibel**: Dapat dimainkan menggunakan 1, 2, atau hingga 3 dadu sekaligus.
+- **Sistem Ronde & Skor Virtual**: Dilengkapi dengan perhitungan ronde, skor, dan chip virtual untuk simulasi permainan seru.
+- **Riwayat Lemparan**: Panel khusus yang menampilkan hasil lemparan dadu sebelumnya secara langsung.
+- **Pengaturan Lengkap**: 
+  - Ubah Nama Pemain.
+  - Atur Jumlah Dadu (1-3) & Jumlah Ronde Maksimal.
+  - Nyalakan/Matikan suara & getar (vibrate) saat dadu dikocok.
+  - Tampilkan/Sembunyikan Riwayat & Papan Skor.
 
-## Cara Menjalankan Web Preview
+---
 
-```bash
-npm install
-npm run dev
-```
+## 💻 Persiapan Awal (Untuk Orang Awam)
 
-## Cara Menyiapkan Build APK Android
+Sebelum menjalankan aplikasi di komputer Anda, pastikan Anda telah menyiapkan beberapa hal dasar berikut:
 
-Install Quasar CLI jika belum ada:
+1. **Node.js**: Software utama untuk menjalankan server pengembangan aplikasi web.
+   - [Download Node.js di sini](https://nodejs.org/) (Pilih versi **LTS** yang direkomendasikan).
+   - Setelah install, pastikan instalasi sukses dengan membuka Command Prompt (CMD) lalu ketik: `node -v` dan `npm -v`.
+2. **Android Studio** *(Hanya jika ingin membuat aplikasi Android/APK sendiri)*:
+   - [Download Android Studio di sini](https://developer.android.com/studio).
+   - Berguna untuk menyediakan Android SDK (Software Development Kit) dan Java JDK bawaan yang dibutuhkan untuk proses pembuatan file `.apk`.
 
-```bash
-npm install -g @quasar/cli
-```
+---
 
-Tambahkan mode Capacitor:
+## 🚀 Cara Menjalankan Aplikasi di Web (Komputer/Laptop)
 
-```bash
-quasar mode add capacitor
-```
+Ikuti langkah mudah berikut untuk membuka game di browser Anda:
 
-Jalankan mode Android untuk development:
+1. **Download / Clone Source Code**:
+   - Jika Anda menggunakan Git, jalankan:
+     ```bash
+     git clone https://github.com/Solveraindonesia/dice-game.git
+     ```
+   - Atau Anda bisa klik tombol **Code** -> **Download ZIP** di halaman GitHub ini, lalu ekstrak folder ZIP tersebut di komputer Anda.
 
-```bash
-npm run dev:android
-```
+2. **Masuk ke Folder Project**:
+   - Buka Command Prompt (CMD) atau Terminal, lalu masuk ke direktori folder yang telah diekstrak:
+     ```bash
+     cd quasar-dice-game
+     ```
 
-Build Android:
+3. **Install Dependensi**:
+   - Download semua pustaka pendukung aplikasi dengan mengetik:
+     ```bash
+     npm install
+     ```
 
-```bash
-npm run build:android
-```
+4. **Jalankan Uji Coba Lokal (Web Preview)**:
+   - Mulai server lokal dengan mengetik:
+     ```bash
+     npm run dev
+     ```
+   - Setelah proses selesai, browser Anda akan otomatis terbuka menampilkan game di alamat: `http://localhost:9000/`. Jika tidak terbuka otomatis, salin alamat tersebut ke Google Chrome atau browser lainnya.
 
-Setelah build, buka folder Android melalui Android Studio untuk membuat APK debug/release sesuai kebutuhan signing.
+---
 
-## Catatan Produksi
+## 🤖 Cara Membuat Aplikasi Android (File APK)
 
-1. Source code ini belum menyertakan file APK karena APK harus dibuild pada komputer yang memiliki Android Studio, Android SDK, dan konfigurasi signing.
-2. Chip dalam aplikasi ini hanya skor hiburan lokal, bukan sistem taruhan atau transaksi uang.
-3. Bila ingin benar-benar sama dengan video referensi, aset visual seperti gambar cup/dadu asli bisa diganti dari CSS menjadi asset PNG/SVG custom.
-4. Untuk kebutuhan client, tahap berikutnya adalah testing di device Android fisik, resize tampilan pada beberapa ukuran layar, lalu build APK final.
+Aplikasi ini sudah dikonfigurasi menggunakan **Capacitor** agar bisa langsung dijadikan file APK Android tanpa perlu menulis kode Java baru.
+
+### Langkah-langkah Pembuatan APK:
+
+1. **Tambahkan Mode Android**:
+   - Jalankan perintah berikut untuk menginisialisasi sistem Capacitor Android:
+     ```bash
+     npx quasar mode add capacitor
+     ```
+     *(Masukkan App ID: `com.solveraindonesia.dicegame` dan App Name: `Dice Fun` saat diminta).*
+
+2. **Hubungkan Sistem Android SDK & Java JDK**:
+   - Pastikan path Android SDK dan JDK Android Studio sudah terhubung dengan benar di sistem Anda. Anda bisa mengetik perintah berikut di command prompt untuk mengaturnya secara sementara sebelum build:
+     ```cmd
+     set JAVA_HOME=C:\PROGRA~1\Android\ANDROI~1\jbr
+     set ANDROID_HOME=%USERPROFILE%\AppData\Local\Android\Sdk
+     set ANDROID_SDK_ROOT=%USERPROFILE%\AppData\Local\Android\Sdk
+     ```
+
+3. **Build Web Assets**:
+   - Kompilasi kode web game Anda menjadi siap pakai:
+     ```bash
+     npx quasar build -m capacitor -T android
+     ```
+
+4. **Kompilasi Menjadi APK**:
+   - Masuk ke folder android dan jalankan gradle untuk membungkus game menjadi aplikasi debug siap install:
+     ```cmd
+     cd src-capacitor/android
+     .\gradlew.bat assembleDebug
+     ```
+
+5. **Lokasi File APK**:
+   - Setelah proses selesai (BUILD SUCCESSFUL), file APK debug Anda akan berada di:
+     `src-capacitor/android/app/build/outputs/apk/debug/app-debug.apk`
+   - Salin file `app-debug.apk` tersebut ke handphone Android Anda menggunakan kabel data atau WhatsApp/Google Drive, lalu buka file tersebut di handphone untuk menginstalnya.
+
+---
+
+## 📂 Struktur Utama Folder Aplikasi
+
+Berikut adalah panduan singkat letak kode penting jika Anda ingin memodifikasinya:
+
+- **`src/components/`**: Berisi komponen game seperti wadah kocokan (`DiceCup.vue`) dan komponen dadu 3D (`Dice3D.vue`).
+- **`src/pages/`**: Halaman-halaman utama aplikasi (Splash Screen, Menu Utama, Area Bermain Game, Pengaturan, Cara Bermain, dan Hasil Akhir).
+- **`src/css/app.css`**: Pengaturan tema visual, warna primer hijau/merah, bayangan, layout responsif, dan efek transisi.
+- **`src/stores/gameStore.js`**: Pusat pengaturan logika game (state), seperti pengocokan angka dadu acak, pengurangan chip virtual, riwayat ronde, dan status selesai.
+- **`src-capacitor/`**: Folder khusus konfigurasi native Android (dihasilkan otomatis setelah Capacitor ditambahkan).
+
+---
+
+## 📝 Catatan Penting
+
+1. **Chip Virtual**: Chip di dalam game ini murni hanya berupa poin digital lokal untuk keseruan bermain dan **tidak memiliki nilai uang asli** (tidak ada fitur transaksi/perjudian).
+2. **Three.js Optimization**: Game dadu 3D menggunakan WebGL. Jika game terasa lambat di perangkat Anda, pastikan fitur hardware acceleration pada Google Chrome sudah aktif di menu pengaturan browser Anda.
