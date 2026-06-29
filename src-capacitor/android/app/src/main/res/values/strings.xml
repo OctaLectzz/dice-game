@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Dice Fun</string>
+    <string name="title_activity_main">Dice Fun</string>
+    <string name="package_name">com.solveraindonesia.dicegame</string>
+    <string name="custom_url_scheme">com.solveraindonesia.dicegame</string>
+</resources>

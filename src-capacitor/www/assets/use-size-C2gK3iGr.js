@@ -1,0 +1,1 @@
+import{v as e}from"./render-C8_SWbc_.js";var t={xs:18,sm:24,md:32,lg:38,xl:46},n={size:String};function r(n,r=t){return e(()=>n.size===void 0?null:{fontSize:n.size in r?`${r[n.size]}px`:n.size})}export{t as n,n as r,r as t};
