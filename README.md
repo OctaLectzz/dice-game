@@ -41,7 +41,7 @@ Ikuti langkah mudah berikut untuk membuka game di browser Anda:
 1. **Download / Clone Source Code**:
    - Jika Anda menggunakan Git, jalankan:
      ```bash
-     git clone https://github.com/Solveraindonesia/dice-game.git
+     git clone https://github.com/OctaLectzz/dice-game.git
      ```
    - Atau Anda bisa klik tombol **Code** -> **Download ZIP** di halaman GitHub ini, lalu ekstrak folder ZIP tersebut di komputer Anda.
 
