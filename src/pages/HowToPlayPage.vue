@@ -12,23 +12,23 @@
       <div class="guide-list">
         <div class="guide-item">
           <span>1</span>
-          <p>Tekan tombol <b>Roll</b> pada halaman permainan.</p>
+          <p>Di halaman permainan, sentuh/tahan <b>penutup merah</b> pada area dadu.</p>
         </div>
         <div class="guide-item">
           <span>2</span>
-          <p>Aplikasi akan menampilkan animasi lempar dadu seperti cup pada video referensi.</p>
+          <p>Seret penutup ke bawah/maju sampai indikator berubah menjadi <b>Lepaskan untuk roll</b>. Penutup akan mengikuti arah geseranmu.</p>
         </div>
         <div class="guide-item">
           <span>3</span>
-          <p>Angka dadu digenerate otomatis dari 1 sampai 6.</p>
+          <p>Lepaskan penutup untuk mengocok dadu secara otomatis. Dadu bernilai 1 sampai 6.</p>
         </div>
         <div class="guide-item">
           <span>4</span>
-          <p>Hasil roll disimpan ke riwayat. Skor bertambah berdasarkan total angka dadu.</p>
+          <p>Setelah animasi selesai, penutup terbuka dan hasil dadu tampil. Skor, chip, dan riwayat bertambah berdasarkan total dadu.</p>
         </div>
         <div class="guide-item">
           <span>5</span>
-          <p>Permainan selesai ketika jumlah ronde sesuai pengaturan sudah tercapai.</p>
+          <p>Tarik penutup lagi untuk ronde berikutnya, atau tekan <b>RESET</b> untuk mulai ulang. Permainan selesai saat jumlah ronde sesuai pengaturan tercapai.</p>
         </div>
       </div>
 

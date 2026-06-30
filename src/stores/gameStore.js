@@ -57,7 +57,7 @@ const state = reactive({
   rolling: false,
   finished: false,
   lastTotal: 0,
-  lastResultText: 'Tekan Roll untuk mulai'
+  lastResultText: 'Tarik penutup untuk mulai'
 })
 
 let audioContext
@@ -227,7 +227,7 @@ function resetGame() {
   state.rolling = false
   state.finished = false
   state.lastTotal = 0
-  state.lastResultText = 'Tekan Roll untuk mulai'
+  state.lastResultText = 'Tarik penutup untuk mulai'
 }
 
 function updateSettings(partial) {

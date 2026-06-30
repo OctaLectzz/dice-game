@@ -9,7 +9,7 @@
         <div class="hero-copy">
           <p class="eyebrow">Private Entertainment</p>
           <h1>Dice Fun</h1>
-          <p>Mainkan dadu cepat dengan animasi cup, hasil otomatis, riwayat roll, dan skor.</p>
+          <p>Tarik penutup merah, lepaskan untuk roll, lalu lihat hasil dadu otomatis dengan riwayat dan skor.</p>
         </div>
       </section>
 
