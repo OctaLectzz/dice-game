@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@quasar/app-vite": "latest",
+    "jimp": "^1.6.1",
     "typescript": "latest",
     "vite": "latest"
   },
