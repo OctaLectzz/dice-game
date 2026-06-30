@@ -52,26 +52,14 @@
       "@capacitor/android": [
         "./../src-capacitor/node_modules/@capacitor/android"
       ],
-      "@capacitor/android/*": [
-        "./../src-capacitor/node_modules/@capacitor/android/*"
-      ],
       "@capacitor/app": [
         "./../src-capacitor/node_modules/@capacitor/app"
-      ],
-      "@capacitor/app/*": [
-        "./../src-capacitor/node_modules/@capacitor/app/*"
       ],
       "@capacitor/cli": [
         "./../src-capacitor/node_modules/@capacitor/cli"
       ],
-      "@capacitor/cli/*": [
-        "./../src-capacitor/node_modules/@capacitor/cli/*"
-      ],
       "@capacitor/core": [
         "./../src-capacitor/node_modules/@capacitor/core"
-      ],
-      "@capacitor/core/*": [
-        "./../src-capacitor/node_modules/@capacitor/core/*"
       ]
     }
   },

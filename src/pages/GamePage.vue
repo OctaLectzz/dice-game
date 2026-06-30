@@ -10,7 +10,6 @@
         <q-btn flat round dense icon="settings" color="dark" to="/settings" />
       </header>
 
-      <GameHeaderSlots :variant="state.round" />
 
       <section v-if="state.settings.showScore" class="score-panel">
         <div>
@@ -38,7 +37,12 @@
           :dice="state.dice"
           :rolling="state.rolling"
           :open="!state.rolling && state.lastTotal > 0"
+          @roll-request="handleRoll"
         />
+
+        <button class="scene-reset-button" type="button" :disabled="state.rolling" @click="handleReset">
+          RESET
+        </button>
       </main>
 
       <section v-if="state.settings.showHistory" class="history-panel">
@@ -58,18 +62,22 @@
         </div>
       </section>
 
-      <footer class="game-footer">
+      <footer class="game-footer drag-footer">
         <q-btn
+          v-if="state.finished"
           unelevated
           rounded
           color="secondary"
           size="lg"
-          icon="casino"
-          :label="state.finished ? 'Lihat Hasil' : state.rolling ? 'Rolling...' : 'ROLL'"
+          icon="emoji_events"
+          label="Lihat Hasil"
           class="roll-button"
-          :loading="state.rolling"
           @click="handleRoll"
         />
+        <div v-else class="drag-instruction" :class="{ active: state.rolling }">
+          <b>{{ state.rolling ? 'Rolling...' : 'Tarik penutup ke bawah' }}</b>
+          <span>{{ state.rolling ? 'Dadu sedang diacak otomatis' : 'Lepaskan penutup untuk melempar dadu' }}</span>
+        </div>
       </footer>
     </div>
   </q-page>
@@ -80,11 +88,10 @@ import { watch } from 'vue'
 import { Dialog } from 'quasar'
 import { useRouter } from 'vue-router'
 import DiceCup from '../components/DiceCup.vue'
-import GameHeaderSlots from '../components/GameHeaderSlots.vue'
 import { useGameStore } from '../stores/gameStore'
 
 const router = useRouter()
-const { state, progress, rollDice } = useGameStore()
+const { state, progress, rollDice, resetGame } = useGameStore()
 
 async function handleRoll() {
   if (state.finished) {
@@ -97,6 +104,11 @@ async function handleRoll() {
   if (state.finished) {
     window.setTimeout(() => router.push({ name: 'result' }), 650)
   }
+}
+
+function handleReset() {
+  if (state.rolling) return
+  resetGame()
 }
 
 function goMenu() {

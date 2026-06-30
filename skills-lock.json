@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "3d-model-generation": {
+      "source": "eachlabs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/3d-model-generation/SKILL.md",
+      "computedHash": "f9fff75f4f58f6edc541377c98dda83faf1fe42ed82c1916291d1a3754052bf9"
+    },
+    "3d-modeling": {
+      "source": "omer-metin/skills-for-antigravity",
+      "sourceType": "github",
+      "skillPath": "skills/3d-modeling/SKILL.md",
+      "computedHash": "dd0beea41a5f5711c6a8b209bb2218340ab7afabe26147eb1560e4d26d65f7c5"
+    },
+    "3d-web-experience": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/3d-web-experience/SKILL.md",
+      "computedHash": "87c4b32078381ee1e6df164ddd5c28dd67fc7552431a7415626e63b8cf74b11a"
+    }
+  }
+}

@@ -39,11 +39,7 @@ Sebelum menjalankan aplikasi di komputer Anda, pastikan Anda telah menyiapkan be
 Ikuti langkah mudah berikut untuk membuka game di browser Anda:
 
 1. **Download / Clone Source Code**:
-   - Jika Anda menggunakan Git, jalankan:
-     ```bash
-     git clone https://github.com/OctaLectzz/dice-game.git
-     ```
-   - Atau Anda bisa klik tombol **Code** -> **Download ZIP** di halaman GitHub ini, lalu ekstrak folder ZIP tersebut di komputer Anda.
+   -  **Download ZIP** di halaman drive ini, lalu ekstrak folder ZIP tersebut di komputer Anda.
 
 2. **Masuk ke Folder Project**:
    - Buka Command Prompt (CMD) atau Terminal, lalu masuk ke direktori folder yang telah diekstrak:

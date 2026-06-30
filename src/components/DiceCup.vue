@@ -1,13 +1,30 @@
 <template>
-  <div class="three-dice-scene" :class="{ 'is-rolling': rolling, 'is-open': open }">
-    <div ref="stageRef" class="three-dice-stage" aria-label="Area dadu 3D dengan penutup realistis" />
+  <div
+    class="three-dice-scene"
+    :class="{
+      'is-rolling': rolling,
+      'is-open': open,
+      'is-dragging': isDragging,
+      'can-drag': canDrag
+    }"
+    @pointerdown="startDrag"
+    @pointermove="moveDrag"
+    @pointerup="endDrag"
+    @pointercancel="cancelDrag"
+    @lostpointercapture="cancelDrag"
+  >
+    <div ref="stageRef" class="three-dice-stage" aria-label="Tarik penutup dadu ke bawah untuk roll" />
+    <div class="drag-hint" :class="{ 'is-ready': dragProgress >= 1 }">
+      <span>{{ dragProgress >= 1 ? 'Lepaskan untuk roll' : open ? 'Tarik lagi untuk roll' : 'Tarik penutup ke bawah' }}</span>
+      <b>⌄</b>
+    </div>
   </div>
 </template>
 
 <script setup>
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
   dice: {
@@ -24,61 +41,68 @@ const props = defineProps({
   }
 })
 
+const emit = defineEmits(['roll-request'])
+
 const stageRef = ref(null)
+const isDragging = ref(false)
+const dragOffset = ref({ x: 0, y: 0 })
+const dragProgress = computed(() => Math.min(1, Math.max(0, dragOffset.value.y) / dragThresholdPx()))
+const canDrag = computed(() => !props.rolling)
 
 let renderer
 let scene
 let camera
 let diceGroup
 let cupGroup
-let floorMesh
+let trayGroup
 let shadowPlane
 let resizeObserver
 let animationFrame = 0
 let lastTime = 0
 let shakePhase = 0
 let revealPulse = 0
+let dragPointerId = null
+let dragStartX = 0
+let dragStartY = 0
 let diceMeshes = []
 let disposableItems = []
 
+const closedCupY = 0.02
+const openCupY = 1.72
 const diceTargets = {
-  1: { x: 0, y: 0, z: 0 },
-  2: { x: -Math.PI / 2, y: 0, z: 0 },
-  3: { x: 0, y: -Math.PI / 2, z: 0 },
-  4: { x: 0, y: Math.PI / 2, z: 0 },
-  5: { x: Math.PI / 2, y: 0, z: 0 },
-  6: { x: Math.PI, y: 0, z: 0 }
+  1: { x: -0.18, y: -0.54, z: 0.2 },
+  2: { x: -Math.PI / 2, y: 0.28, z: -0.18 },
+  3: { x: 0.08, y: -Math.PI / 2, z: -0.28 },
+  4: { x: 0.08, y: Math.PI / 2, z: 0.22 },
+  5: { x: Math.PI / 2, y: -0.22, z: 0.16 },
+  6: { x: Math.PI, y: 0.28, z: -0.18 }
 }
 
 const layouts = {
   1: [[0, 0]],
-  2: [[-0.68, 0], [0.68, 0]],
-  3: [[-0.76, -0.08], [0, 0.42], [0.76, -0.08]],
-  4: [[-0.78, 0.3], [0.78, 0.3], [-0.78, -0.54], [0.78, -0.54]],
-  5: [[-0.94, 0.28], [0, 0.52], [0.94, 0.28], [-0.48, -0.64], [0.48, -0.64]],
-  6: [[-1.02, 0.32], [0, 0.56], [1.02, 0.32], [-1.02, -0.56], [0, -0.78], [1.02, -0.56]]
-}
-
-const pipPatterns = {
-  1: [[0, 0]],
-  2: [[-0.22, 0.22], [0.22, -0.22]],
-  3: [[-0.23, 0.23], [0, 0], [0.23, -0.23]],
-  4: [[-0.23, 0.23], [0.23, 0.23], [-0.23, -0.23], [0.23, -0.23]],
-  5: [[-0.23, 0.23], [0.23, 0.23], [0, 0], [-0.23, -0.23], [0.23, -0.23]],
-  6: [[-0.23, 0.25], [0.23, 0.25], [-0.23, 0], [0.23, 0], [-0.23, -0.25], [0.23, -0.25]]
+  2: [[-0.72, -0.02], [0.72, -0.02]],
+  3: [[-0.86, -0.1], [0, 0.5], [0.86, -0.1]],
+  4: [[-0.88, 0.34], [0.88, 0.34], [-0.88, -0.52], [0.88, -0.52]],
+  5: [[-1.02, 0.26], [0, 0.58], [1.02, 0.26], [-0.5, -0.62], [0.5, -0.62]],
+  6: [[-1.08, 0.32], [0, 0.58], [1.08, 0.32], [-1.08, -0.58], [0, -0.78], [1.08, -0.58]]
 }
 
 const faceDefinitions = [
-  { value: 1, normal: [0, 0, 1], u: [1, 0, 0], v: [0, 1, 0] },
-  { value: 6, normal: [0, 0, -1], u: [-1, 0, 0], v: [0, 1, 0] },
-  { value: 3, normal: [1, 0, 0], u: [0, 0, -1], v: [0, 1, 0] },
-  { value: 4, normal: [-1, 0, 0], u: [0, 0, 1], v: [0, 1, 0] },
-  { value: 2, normal: [0, 1, 0], u: [1, 0, 0], v: [0, 0, -1] },
-  { value: 5, normal: [0, -1, 0], u: [1, 0, 0], v: [0, 0, 1] }
+  { value: 1, normal: [0, 0, 1], rotation: [0, 0, 0], position: [0, 0, 0.486] },
+  { value: 6, normal: [0, 0, -1], rotation: [0, Math.PI, 0], position: [0, 0, -0.486] },
+  { value: 3, normal: [1, 0, 0], rotation: [0, Math.PI / 2, 0], position: [0.486, 0, 0] },
+  { value: 4, normal: [-1, 0, 0], rotation: [0, -Math.PI / 2, 0], position: [-0.486, 0, 0] },
+  { value: 2, normal: [0, 1, 0], rotation: [-Math.PI / 2, 0, 0], position: [0, 0.486, 0] },
+  { value: 5, normal: [0, -1, 0], rotation: [Math.PI / 2, 0, 0], position: [0, -0.486, 0] }
 ]
 
 const easeOutCubic = (value) => 1 - Math.pow(1 - value, 3)
 const lerp = (from, to, amount) => from + (to - from) * amount
+
+function dragThresholdPx() {
+  const height = stageRef.value?.getBoundingClientRect().height || 320
+  return Math.max(80, height * 0.28)
+}
 
 function track(item) {
   disposableItems.push(item)
@@ -88,21 +112,20 @@ function track(item) {
 function createRenderer() {
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' })
   renderer.setClearColor(0x000000, 0)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.5))
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2.2))
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.toneMapping = THREE.ACESFilmicToneMapping
-  renderer.toneMappingExposure = 1.04
+  renderer.toneMappingExposure = 1.12
   stageRef.value.appendChild(renderer.domElement)
 }
 
 function createLights() {
-  const ambient = new THREE.HemisphereLight(0xffffff, 0x7a4638, 1.45)
-  scene.add(ambient)
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x7e463c, 1.45))
 
   const keyLight = new THREE.DirectionalLight(0xffffff, 4.8)
-  keyLight.position.set(-3.8, 6.4, 5.2)
+  keyLight.position.set(-3.8, 6.8, 5.2)
   keyLight.castShadow = true
   keyLight.shadow.mapSize.set(2048, 2048)
   keyLight.shadow.camera.near = 0.5
@@ -113,113 +136,224 @@ function createLights() {
   keyLight.shadow.camera.bottom = -5
   scene.add(keyLight)
 
-  const fillLight = new THREE.DirectionalLight(0xffe3cf, 1.35)
-  fillLight.position.set(4.5, 2.5, -2.5)
+  const fillLight = new THREE.DirectionalLight(0xffe8d8, 1.65)
+  fillLight.position.set(4.5, 2.8, -2.5)
   scene.add(fillLight)
 
-  const rimLight = new THREE.PointLight(0xfff0df, 2.2, 9)
-  rimLight.position.set(2.6, 3.8, 3.4)
+  const rimLight = new THREE.PointLight(0xfff4e8, 2.4, 9)
+  rimLight.position.set(2.4, 3.8, 3.6)
   scene.add(rimLight)
 }
 
-function createFloor() {
-  floorMesh = new THREE.Mesh(
-    track(new THREE.CylinderGeometry(3.15, 3.35, 0.18, 128)),
-    track(new THREE.MeshPhysicalMaterial({
-      color: 0xfffbf1,
-      roughness: 0.48,
-      metalness: 0.02,
-      clearcoat: 0.35,
-      clearcoatRoughness: 0.45
-    }))
-  )
-  floorMesh.position.y = -1.1
-  floorMesh.receiveShadow = true
-  scene.add(floorMesh)
+function createTray() {
+  trayGroup = new THREE.Group()
+  trayGroup.position.y = -1.2
+  trayGroup.rotation.x = -0.02
 
-  const rim = new THREE.Mesh(
-    track(new THREE.TorusGeometry(3.18, 0.035, 16, 128)),
-    track(new THREE.MeshPhysicalMaterial({ color: 0xf4eadc, roughness: 0.32, clearcoat: 0.55 }))
-  )
-  rim.position.y = -0.995
-  rim.rotation.x = Math.PI / 2
-  rim.receiveShadow = true
-  scene.add(rim)
-
-  shadowPlane = new THREE.Mesh(
-    track(new THREE.CircleGeometry(3.05, 96)),
-    track(new THREE.ShadowMaterial({ color: 0x1f140f, opacity: 0.22 }))
-  )
-  shadowPlane.position.y = -0.985
-  shadowPlane.rotation.x = -Math.PI / 2
-  shadowPlane.receiveShadow = true
-  scene.add(shadowPlane)
-}
-
-function addFacePips(die, face, pipMaterial, redMaterial) {
-  const normal = new THREE.Vector3(...face.normal)
-  const uVector = new THREE.Vector3(...face.u)
-  const vVector = new THREE.Vector3(...face.v)
-  const center = normal.clone().multiplyScalar(0.394)
-  const material = face.value === 1 ? redMaterial : pipMaterial
-  const rotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal)
-
-  pipPatterns[face.value].forEach(([x, y]) => {
-    const pip = new THREE.Mesh(track(new THREE.CircleGeometry(0.065, 36)), material)
-    pip.position.copy(center)
-      .add(uVector.clone().multiplyScalar(x))
-      .add(vVector.clone().multiplyScalar(y))
-    pip.quaternion.copy(rotation)
-    pip.renderOrder = 2
-    die.add(pip)
-  })
-}
-
-function createDie(value, index, count) {
-  const die = new THREE.Group()
-  const bodyMaterial = track(new THREE.MeshPhysicalMaterial({
-    color: 0xfdfcf8,
-    roughness: 0.28,
-    metalness: 0.02,
-    clearcoat: 0.72,
+  const trayMaterial = track(new THREE.MeshPhysicalMaterial({
+    color: 0xb50916,
+    roughness: 0.34,
+    metalness: 0.08,
+    clearcoat: 0.8,
     clearcoatRoughness: 0.2
   }))
-  const pipMaterial = track(new THREE.MeshStandardMaterial({ color: 0x101722, roughness: 0.42 }))
-  const redPipMaterial = track(new THREE.MeshStandardMaterial({ color: 0xe6282f, roughness: 0.36 }))
+  const trayInnerMaterial = track(new THREE.MeshPhysicalMaterial({
+    color: 0xffecea,
+    roughness: 0.58,
+    metalness: 0.01,
+    clearcoat: 0.35,
+    clearcoatRoughness: 0.42
+  }))
 
-  const body = new THREE.Mesh(track(new RoundedBoxGeometry(0.78, 0.78, 0.78, 8, 0.095)), bodyMaterial)
+  const base = new THREE.Mesh(track(new THREE.CylinderGeometry(3.05, 3.25, 0.36, 128)), trayMaterial)
+  base.position.y = -0.22
+  base.castShadow = true
+  base.receiveShadow = true
+  trayGroup.add(base)
+
+  const inner = new THREE.Mesh(track(new THREE.CylinderGeometry(2.88, 2.98, 0.08, 128)), trayInnerMaterial)
+  inner.position.y = 0.02
+  inner.receiveShadow = true
+  trayGroup.add(inner)
+
+  const lip = new THREE.Mesh(track(new THREE.TorusGeometry(3.03, 0.055, 18, 128)), trayMaterial)
+  lip.position.y = 0.1
+  lip.rotation.x = Math.PI / 2
+  lip.castShadow = true
+  trayGroup.add(lip)
+
+  shadowPlane = new THREE.Mesh(
+    track(new THREE.CircleGeometry(3.55, 96)),
+    track(new THREE.MeshBasicMaterial({ color: 0x2b1715, transparent: true, opacity: 0.22, depthWrite: false }))
+  )
+  shadowPlane.position.y = -0.46
+  shadowPlane.rotation.x = -Math.PI / 2
+  shadowPlane.scale.set(1.1, 0.48, 1)
+  trayGroup.add(shadowPlane)
+
+  scene.add(trayGroup)
+}
+
+function drawRedCrescent(context) {
+  context.save()
+  context.translate(128, 128)
+  context.rotate(-0.08)
+  context.shadowColor = 'rgba(0, 0, 0, 0.24)'
+  context.shadowBlur = 5
+  context.shadowOffsetY = 3
+
+  context.fillStyle = '#d80f25'
+  context.beginPath()
+  context.arc(-18, -4, 74, 0, Math.PI * 2)
+  context.fill()
+
+  context.globalCompositeOperation = 'destination-out'
+  context.beginPath()
+  context.arc(18, 0, 58, 0, Math.PI * 2)
+  context.fill()
+  context.globalCompositeOperation = 'source-over'
+
+  context.fillStyle = '#e92735'
+  context.strokeStyle = '#fff7f7'
+  context.lineWidth = 12
+  context.beginPath()
+  context.arc(32, 4, 52, 0, Math.PI * 2)
+  context.fill()
+  context.stroke()
+
+  context.strokeStyle = '#ffffff'
+  context.lineWidth = 8
+  context.beginPath()
+  context.arc(-18, -4, 74, Math.PI * 0.62, Math.PI * 1.62)
+  context.stroke()
+  context.restore()
+}
+
+function drawGreenSwirl(context) {
+  context.save()
+  context.translate(128, 128)
+  context.shadowColor = 'rgba(0, 0, 0, 0.24)'
+  context.shadowBlur = 5
+  context.shadowOffsetY = 3
+  context.fillStyle = '#0a8f32'
+  context.strokeStyle = '#f8fff7'
+  context.lineWidth = 12
+
+  for (let index = 0; index < 5; index += 1) {
+    context.save()
+    context.rotate((Math.PI * 2 * index) / 5)
+    context.beginPath()
+    context.moveTo(0, 0)
+    context.bezierCurveTo(22, -62, 94, -62, 82, -8)
+    context.bezierCurveTo(72, 35, 28, 48, 2, 16)
+    context.closePath()
+    context.fill()
+    context.stroke()
+    context.restore()
+  }
+
+  context.fillStyle = '#0b7f2d'
+  context.beginPath()
+  context.arc(0, 0, 20, 0, Math.PI * 2)
+  context.fill()
+  context.restore()
+}
+
+function makeSymbolTexture(type) {
+  const canvas = document.createElement('canvas')
+  canvas.width = 256
+  canvas.height = 256
+  const context = canvas.getContext('2d')
+  context.clearRect(0, 0, 256, 256)
+  context.lineCap = 'round'
+  context.lineJoin = 'round'
+
+  if (type === 'green') {
+    drawGreenSwirl(context)
+  } else if (type === 'black') {
+    drawRedCrescent(context)
+    context.save()
+    context.globalAlpha = 0.82
+    context.fillStyle = '#111111'
+    context.strokeStyle = '#ffffff'
+    context.lineWidth = 9
+    context.beginPath()
+    context.ellipse(112, 154, 55, 36, -0.22, 0, Math.PI * 2)
+    context.fill()
+    context.stroke()
+    context.restore()
+  } else {
+    drawRedCrescent(context)
+  }
+
+  const texture = track(new THREE.CanvasTexture(canvas))
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.anisotropy = 8
+  return texture
+}
+
+function symbolTypeForValue(value) {
+  if (value === 2 || value === 5) return 'green'
+  if (value === 4 || value === 6) return 'black'
+  return 'red'
+}
+
+function createFaceSymbol(face) {
+  const texture = makeSymbolTexture(symbolTypeForValue(face.value))
+  const material = track(new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4
+  }))
+  const symbol = new THREE.Mesh(track(new THREE.PlaneGeometry(0.72, 0.72)), material)
+  symbol.renderOrder = 3
+  symbol.position.set(...face.position)
+  symbol.rotation.set(...face.rotation)
+  return symbol
+}
+
+function createDie(value, index, total) {
+  const die = new THREE.Group()
+  const base = layouts[total]?.[index] || [0, 0]
+  die.position.set(base[0], 0.02, base[1])
+  die.rotation.set(-0.18 + index * 0.07, 0.32 - index * 0.18, -0.12 + index * 0.12)
+  die.scale.setScalar(1.22)
+
+  const body = new THREE.Mesh(
+    track(new RoundedBoxGeometry(0.92, 0.92, 0.92, 5, 0.13)),
+    track(new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      roughness: 0.42,
+      metalness: 0.02,
+      clearcoat: 0.48,
+      clearcoatRoughness: 0.18
+    }))
+  )
   body.castShadow = true
   body.receiveShadow = true
   die.add(body)
 
-  const bevelGlow = new THREE.Mesh(
-    track(new RoundedBoxGeometry(0.782, 0.782, 0.782, 5, 0.095)),
-    track(new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.08 }))
-  )
-  die.add(bevelGlow)
+  faceDefinitions.forEach((face) => die.add(createFaceSymbol(face)))
 
-  faceDefinitions.forEach((face) => addFacePips(die, face, pipMaterial, redPipMaterial))
-
-  const countLayout = layouts[count] || layouts[6]
-  const [x, z] = countLayout[index] || [0, 0]
-  die.position.set(x, -0.55, z)
+  const target = diceTargets[value] || diceTargets[1]
   die.userData.basePosition = die.position.clone()
-  die.userData.restRotation = {
-    x: diceTargets[value]?.x || 0,
-    y: diceTargets[value]?.y || 0,
-    z: diceTargets[value]?.z || 0
-  }
-  die.rotation.set(die.userData.restRotation.x, die.userData.restRotation.y, die.userData.restRotation.z)
-  die.scale.setScalar(count >= 5 ? 0.72 : count >= 3 ? 0.8 : 0.94)
-
+  die.userData.restRotation = new THREE.Euler(target.x, target.y, target.z)
+  die.rotation.copy(die.userData.restRotation)
   return die
 }
 
 function disposeObject(object) {
-  object.traverse((child) => {
-    if (child.geometry) child.geometry.dispose()
-    if (Array.isArray(child.material)) child.material.forEach((material) => material.dispose?.())
-    else child.material?.dispose?.()
+  object.traverse?.((item) => {
+    item.geometry?.dispose?.()
+    if (Array.isArray(item.material)) {
+      item.material.forEach((material) => material.dispose?.())
+    } else {
+      item.material?.dispose?.()
+    }
   })
 }
 
@@ -230,6 +364,7 @@ function rebuildDice() {
     diceGroup.remove(die)
     disposeObject(die)
   })
+
   diceMeshes = props.dice.map((value, index) => createDie(value, index, props.dice.length))
   diceMeshes.forEach((die) => diceGroup.add(die))
 }
@@ -237,80 +372,71 @@ function rebuildDice() {
 function createCup() {
   cupGroup = new THREE.Group()
 
-  const leatherRed = track(new THREE.MeshPhysicalMaterial({
-    color: 0xb51226,
-    roughness: 0.38,
-    metalness: 0.03,
-    clearcoat: 0.65,
-    clearcoatRoughness: 0.18
-  }))
-  const darkRed = track(new THREE.MeshPhysicalMaterial({
-    color: 0x5f0712,
-    roughness: 0.34,
-    metalness: 0.05,
-    clearcoat: 0.75,
+  const cupMaterial = track(new THREE.MeshPhysicalMaterial({
+    color: 0xb70d19,
+    roughness: 0.29,
+    metalness: 0.12,
+    clearcoat: 0.95,
     clearcoatRoughness: 0.16
   }))
-  const highlight = track(new THREE.MeshPhysicalMaterial({
-    color: 0xff5c66,
-    roughness: 0.26,
-    clearcoat: 0.9,
-    clearcoatRoughness: 0.12,
-    transparent: true,
-    opacity: 0.55
+  const darkRed = track(new THREE.MeshPhysicalMaterial({
+    color: 0x6b0710,
+    roughness: 0.38,
+    metalness: 0.08,
+    clearcoat: 0.7,
+    clearcoatRoughness: 0.2
   }))
+  const highlight = track(new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.26, depthWrite: false }))
 
   const cupProfile = [
-    new THREE.Vector2(2.04, -1.26),
-    new THREE.Vector2(2.12, -1.08),
-    new THREE.Vector2(1.96, -0.46),
-    new THREE.Vector2(1.78, 0.42),
-    new THREE.Vector2(1.58, 1.08),
-    new THREE.Vector2(1.48, 1.23)
+    new THREE.Vector2(1.96, -1.5),
+    new THREE.Vector2(2.18, -1.34),
+    new THREE.Vector2(2.28, -0.72),
+    new THREE.Vector2(2.24, 0.18),
+    new THREE.Vector2(2.14, 0.92),
+    new THREE.Vector2(1.96, 1.08)
   ]
 
-  const body = new THREE.Mesh(track(new THREE.LatheGeometry(cupProfile, 160)), leatherRed)
+  const body = new THREE.Mesh(track(new THREE.LatheGeometry(cupProfile, 160)), cupMaterial)
   body.castShadow = true
   body.receiveShadow = true
   cupGroup.add(body)
 
-  const topCap = new THREE.Mesh(track(new THREE.CylinderGeometry(1.58, 1.48, 0.22, 160)), darkRed)
-  topCap.position.y = 1.27
-  topCap.castShadow = true
-  topCap.receiveShadow = true
-  cupGroup.add(topCap)
+  const top = new THREE.Mesh(track(new THREE.CylinderGeometry(2.12, 2.28, 0.14, 160)), cupMaterial)
+  top.position.y = 1.08
+  top.castShadow = true
+  cupGroup.add(top)
 
-  const topRim = new THREE.Mesh(track(new THREE.TorusGeometry(1.55, 0.075, 18, 160)), darkRed)
-  topRim.position.y = 1.4
-  topRim.rotation.x = Math.PI / 2
-  topRim.castShadow = true
-  cupGroup.add(topRim)
+  const bottomBand = new THREE.Mesh(track(new THREE.CylinderGeometry(2.32, 2.46, 0.34, 160)), darkRed)
+  bottomBand.position.y = -1.46
+  bottomBand.castShadow = true
+  bottomBand.receiveShadow = true
+  cupGroup.add(bottomBand)
 
-  const bottomRim = new THREE.Mesh(track(new THREE.TorusGeometry(2.07, 0.105, 20, 160)), darkRed)
-  bottomRim.position.y = -1.25
-  bottomRim.rotation.x = Math.PI / 2
-  bottomRim.castShadow = true
-  cupGroup.add(bottomRim)
-
-  for (let i = 0; i < 4; i += 1) {
-    const groove = new THREE.Mesh(
-      track(new THREE.TorusGeometry(1.74 + i * 0.095, 0.012, 8, 128)),
-      track(new THREE.MeshStandardMaterial({ color: 0x7d0b18, roughness: 0.55 }))
-    )
-    groove.position.y = 0.76 - i * 0.48
+  ;[-0.64, 0.18].forEach((y) => {
+    const groove = new THREE.Mesh(track(new THREE.TorusGeometry(2.25, 0.035, 14, 160)), darkRed)
+    groove.position.y = y
     groove.rotation.x = Math.PI / 2
+    groove.castShadow = true
     cupGroup.add(groove)
-  }
+  })
 
-  const shine = new THREE.Mesh(track(new THREE.CapsuleGeometry(0.065, 1.52, 8, 24)), highlight)
-  shine.position.set(-0.82, 0.1, 1.56)
-  shine.rotation.z = -0.15
-  shine.rotation.x = 0.18
-  shine.castShadow = false
+  ;[-0.36, 0.52, 1.12].forEach((y) => {
+    const rim = new THREE.Mesh(track(new THREE.TorusGeometry(2.22, 0.026, 12, 160)), highlight)
+    rim.position.set(0.04, y, 0.02)
+    rim.rotation.x = Math.PI / 2
+    cupGroup.add(rim)
+  })
+
+  const shine = new THREE.Mesh(track(new THREE.PlaneGeometry(0.55, 2.25)), highlight)
+  shine.position.set(1.4, -0.16, 1.7)
+  shine.rotation.set(-0.18, 0.42, -0.06)
   cupGroup.add(shine)
 
-  cupGroup.position.y = props.open ? 2.72 : 0.28
-  cupGroup.rotation.x = -0.09
+  cupGroup.position.y = props.open ? openCupY : closedCupY
+  cupGroup.position.z = 0
+  cupGroup.scale.setScalar(0.84)
+  cupGroup.rotation.set(-0.08, 0.03, 0)
   scene.add(cupGroup)
 }
 
@@ -329,19 +455,30 @@ function updateSize() {
 function animate(time = 0) {
   const delta = Math.min(0.05, (time - lastTime) / 1000 || 0.016)
   lastTime = time
-  shakePhase += delta * 8.5
+  shakePhase += delta * 8.6
   revealPulse = Math.max(0, revealPulse - delta * 1.9)
 
-  const rollingAmount = props.rolling ? 1 : 0
-  const closedCupY = 0.28
-  const targetCupY = props.rolling ? closedCupY : props.open ? 2.92 : closedCupY
-  const liftShake = props.rolling ? Math.max(0, Math.sin(shakePhase * 1.35) * 0.08) : 0
-  cupGroup.position.y = Math.max(closedCupY, lerp(cupGroup.position.y, targetCupY + liftShake, 0.13))
-  cupGroup.rotation.z = lerp(cupGroup.rotation.z, props.rolling ? Math.sin(shakePhase * 1.85) * 0.105 : 0, 0.14)
-  cupGroup.rotation.y = lerp(cupGroup.rotation.y, props.rolling ? Math.cos(shakePhase * 1.45) * 0.12 : 0, 0.14)
-  cupGroup.rotation.x = lerp(cupGroup.rotation.x, props.rolling ? -0.14 + Math.sin(shakePhase) * 0.06 : -0.09, 0.14)
+  const forwardProgress = Math.max(0, dragOffset.value.y) / dragThresholdPx()
+  const dragWorldX = Math.max(-2.7, Math.min(2.7, dragOffset.value.x / 82))
+  const dragWorldY = Math.max(-1.75, Math.min(1.25, -dragOffset.value.y / 112))
+  const dragWorldZ = Math.min(3.1, forwardProgress * 1.95)
+  const baseCupTarget = props.open ? openCupY : closedCupY
+  const rollingShake = props.rolling ? Math.max(0, Math.sin(shakePhase * 1.35) * 0.08) : 0
+  const targetCupX = props.rolling ? 0 : dragWorldX
+  const targetCupY = props.rolling ? closedCupY + rollingShake : baseCupTarget + dragWorldY
+  const targetCupZ = props.rolling ? 0 : dragWorldZ
+  const targetCupScale = 0.84 + (props.rolling ? 0 : Math.min(0.36, forwardProgress * 0.26))
+  const cupSpeed = isDragging.value ? 0.9 : 0.14
 
-  diceGroup.visible = props.open
+  cupGroup.position.x = lerp(cupGroup.position.x, targetCupX, cupSpeed)
+  cupGroup.position.y = lerp(cupGroup.position.y, targetCupY, cupSpeed)
+  cupGroup.position.z = lerp(cupGroup.position.z, targetCupZ, cupSpeed)
+  cupGroup.scale.setScalar(lerp(cupGroup.scale.x, targetCupScale, cupSpeed))
+  cupGroup.rotation.z = lerp(cupGroup.rotation.z, props.rolling ? Math.sin(shakePhase * 1.85) * 0.12 : isDragging.value ? dragWorldX * -0.045 : 0, 0.16)
+  cupGroup.rotation.y = lerp(cupGroup.rotation.y, props.rolling ? Math.cos(shakePhase * 1.45) * 0.13 : 0.03, 0.14)
+  cupGroup.rotation.x = lerp(cupGroup.rotation.x, props.rolling ? -0.15 + Math.sin(shakePhase) * 0.06 : -0.08, 0.14)
+
+  diceGroup.visible = props.open && !props.rolling
   diceGroup.position.x = props.rolling ? Math.sin(shakePhase * 2.2) * 0.08 : 0
   diceGroup.position.z = props.rolling ? Math.cos(shakePhase * 1.9) * 0.065 : 0
 
@@ -351,12 +488,12 @@ function animate(time = 0) {
     const rest = die.userData.restRotation
 
     if (props.rolling) {
-      die.position.y = base.y + Math.abs(Math.sin(phase * 1.8)) * 0.14
-      die.rotation.x += delta * (6.2 + index * 0.7)
-      die.rotation.y += delta * (8.5 + index * 0.6)
-      die.rotation.z += delta * (5.1 + index * 0.45)
+      die.position.y = base.y + Math.abs(Math.sin(phase * 1.8)) * 0.16
+      die.rotation.x += delta * (6.4 + index * 0.75)
+      die.rotation.y += delta * (8.8 + index * 0.62)
+      die.rotation.z += delta * (5.2 + index * 0.48)
     } else {
-      const revealBounce = easeOutCubic(revealPulse) * 0.28
+      const revealBounce = easeOutCubic(revealPulse) * 0.32
       die.position.y = lerp(die.position.y, base.y + revealBounce, 0.18)
       die.rotation.x = lerp(die.rotation.x, rest.x, 0.15)
       die.rotation.y = lerp(die.rotation.y, rest.y, 0.15)
@@ -364,23 +501,24 @@ function animate(time = 0) {
     }
   })
 
-  floorMesh.scale.setScalar(1 + rollingAmount * 0.012)
-  shadowPlane.material.opacity = props.open ? 0.18 : 0.26
+  trayGroup.scale.setScalar(1 + (props.rolling ? 0.014 : 0))
+  shadowPlane.material.opacity = props.open ? 0.18 : 0.28
   renderer.render(scene, camera)
   animationFrame = window.requestAnimationFrame(animate)
 }
 
 function setupScene() {
   scene = new THREE.Scene()
-  camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100)
-  camera.position.set(0, 2.75, 7.8)
-  camera.lookAt(0, -0.48, 0)
+  camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100)
+  camera.position.set(0, 2.85, 10.6)
+  camera.lookAt(0, -0.52, 0)
 
   createRenderer()
   createLights()
-  createFloor()
+  createTray()
 
   diceGroup = new THREE.Group()
+  diceGroup.position.y = -0.88
   scene.add(diceGroup)
   rebuildDice()
   createCup()
@@ -403,6 +541,57 @@ function disposeScene() {
   renderer?.dispose()
 }
 
+function startDrag(event) {
+  if (!canDrag.value) return
+
+  dragPointerId = event.pointerId
+  dragStartX = event.clientX
+  dragStartY = event.clientY
+  dragOffset.value = { x: 0, y: 0 }
+  isDragging.value = true
+  event.currentTarget.setPointerCapture?.(event.pointerId)
+  event.preventDefault()
+}
+
+function moveDrag(event) {
+  if (!isDragging.value || event.pointerId !== dragPointerId) return
+
+  const maxHorizontal = dragThresholdPx() * 3.1
+  const minVertical = -dragThresholdPx() * 1.7
+  const maxVertical = dragThresholdPx() * 2.8
+  dragOffset.value = {
+    x: Math.max(-maxHorizontal, Math.min(event.clientX - dragStartX, maxHorizontal)),
+    y: Math.max(minVertical, Math.min(event.clientY - dragStartY, maxVertical))
+  }
+  event.preventDefault()
+}
+
+function endDrag(event) {
+  if (!isDragging.value || event.pointerId !== dragPointerId) return
+
+
+  const shouldRoll = dragOffset.value.y >= dragThresholdPx()
+  event.currentTarget.releasePointerCapture?.(event.pointerId)
+  isDragging.value = false
+  dragPointerId = null
+
+  if (shouldRoll && !props.rolling) {
+    emit('roll-request')
+  }
+
+  window.setTimeout(() => {
+    dragOffset.value = { x: 0, y: 0 }
+  }, shouldRoll ? 160 : 0)
+  event.preventDefault()
+}
+
+function cancelDrag() {
+  if (!isDragging.value) return
+  isDragging.value = false
+  dragPointerId = null
+  dragOffset.value = { x: 0, y: 0 }
+}
+
 onMounted(setupScene)
 onBeforeUnmount(disposeScene)
 
@@ -419,10 +608,14 @@ watch(
 watch(
   () => props.rolling,
   (isRolling) => {
-    if (!isRolling) {
-      rebuildDice()
-      if (props.open) revealPulse = 1
+    if (isRolling) {
+      dragOffset.value = { x: 0, y: 0 }
+      isDragging.value = false
+      return
     }
+
+    rebuildDice()
+    if (props.open) revealPulse = 1
   }
 )
 
@@ -433,6 +626,3 @@ watch(
   }
 )
 </script>
-
-
-
