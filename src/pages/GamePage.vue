@@ -11,6 +11,8 @@
       </header>
 
 
+      <GameHeaderSlots :dice="state.dice" />
+
       <section v-if="state.settings.showScore" class="score-panel">
         <div>
           <span>Ronde</span>
@@ -88,6 +90,7 @@ import { watch } from 'vue'
 import { Dialog } from 'quasar'
 import { useRouter } from 'vue-router'
 import DiceCup from '../components/DiceCup.vue'
+import GameHeaderSlots from '../components/GameHeaderSlots.vue'
 import { useGameStore } from '../stores/gameStore'
 
 const router = useRouter()
